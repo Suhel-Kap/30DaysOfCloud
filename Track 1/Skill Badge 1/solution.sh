@@ -3,7 +3,7 @@ gcloud compute instances create nucleus-jumphost \
  --zone=us-east1-b 
 
 gcloud container clusters create nucleus-server \
- --region=us-east1
+ --zone us-east1-b
 
 gcloud container clusters get-credentials nucleus-server
 
@@ -61,7 +61,6 @@ gcloud compute target-http-proxies create http-lb-proxy \
   --url-map web-map-http
 
 gcloud compute forwarding-rules create http-content-rule \
-  --address=lb-ipv4-1\
   --global \
   --target-http-proxy=http-lb-proxy \
   --ports=80
