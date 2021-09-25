@@ -1,15 +1,18 @@
 gcloud compute instances create nucleus-jumphost \
  --machine-type=f1-micro \
- --zone=us-east1-b 
+ --zone=us-east1-b \
+ --network=nucleus-vpc
 
 gcloud container clusters create nucleus-server \
+ --network=nucleus-vpc \
+ --num-nodes=1 \
  --zone us-east1-b
 
 gcloud container clusters get-credentials nucleus-server
 
-kubectl create deployment nucleus-server --image=gcr.io/google-samples/hello-app:2.0
+kubectl create deployment hello-server --image=gcr.io/google-samples/hello-app:2.0
 
-kubectl expose deployment nucleus-server --type=LoadBalancer --port 8080
+kubectl expose deployment hello-server --type=LoadBalancer --port 8080
 
 cat << EOF > startup.sh
 #! /bin/bash
@@ -21,11 +24,8 @@ EOF
 
 gcloud compute instance-templates create nucleus-backend-template \
    --region=us-east1 \
-   --network=default \
-   --subnet=default \
-   --tags=allow-health-check \
-   --image-family=debian-9 \
-   --image-project=debian-cloud \
+   --machine-type=g1-small \
+   --network=nucleus-vpc \
    --metadata-from-file startup-script=startup.sh
 
 gcloud compute instance-groups managed create nucleus-backend-group \
@@ -34,18 +34,18 @@ gcloud compute instance-groups managed create nucleus-backend-group \
    --region=us-east1
 
 gcloud compute firewall-rules create nucleus-web-server-fw \
-    --network=default \
-    --action=allow \
-    --direction=ingress \
-    --source-ranges=130.211.0.0/22,35.191.0.0/16 \
-    --target-tags=allow-health-check \
-    --rules=tcp:80
+    --network=nucleus-vpc \
+    --allow=tcp:80
 
 gcloud compute health-checks create http http-basic-check
 
+gcloud compute instance-groups managed \
+  --set-named-ports nucleus-backend-group \
+  --named-ports http:80 \
+  --region us-east1
+
 gcloud compute backend-services create nucleus-web-backend-service \
   --protocol=HTTP \
-  --port-name=http \
   --health-checks=http-basic-check \
   --global
 
