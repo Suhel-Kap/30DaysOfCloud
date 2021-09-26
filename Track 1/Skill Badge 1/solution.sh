@@ -1,18 +1,33 @@
+Task 1 : Create a project jumphost instance (zone: us-east1-b) 
+
 gcloud compute instances create nucleus-jumphost \
- --machine-type=f1-micro \
- --zone=us-east1-b \
- --network=nucleus-vpc
+          --network nucleus-vpc \
+          --zone us-east1-b  \
+          --machine-type f1-micro  \
+          --image-family debian-9  \
+          --image-project debian-cloud \
 
-gcloud container clusters create nucleus-server \
- --network=nucleus-vpc \
- --num-nodes=1 \
- --zone us-east1-b
+---------------------------------------------------------------------------------
 
-gcloud container clusters get-credentials nucleus-server
+Task 2 : Create a Kubernetes service cluster 
 
-kubectl create deployment hello-server --image=gcr.io/google-samples/hello-app:2.0
+gcloud container clusters create nucleus-backend \
+          --num-nodes 1 \
+          --network nucleus-vpc \
+          --region us-east1
+gcloud container clusters get-credentials nucleus-backend \
+          --region us-east1
 
-kubectl expose deployment hello-server --type=LoadBalancer --port 8080
+kubectl create deployment hello-server \
+          --image=gcr.io/google-samples/hello-app:2.0
+
+kubectl expose deployment hello-server \
+          --type=LoadBalancer \
+          --port 8080
+
+-------------------------------------------------------------------------------
+
+Task 3 : Create the web server frontend :-
 
 cat << EOF > startup.sh
 #! /bin/bash
@@ -22,45 +37,49 @@ service nginx start
 sed -i -- 's/nginx/Google Cloud Platform - '"\$HOSTNAME"'/' /var/www/html/index.nginx-debian.html
 EOF
 
-gcloud compute instance-templates create nucleus-backend-template \
-   --region=us-east1 \
-   --machine-type=g1-small \
-   --network=nucleus-vpc \
-   --metadata-from-file startup-script=startup.sh
 
-gcloud compute instance-groups managed create nucleus-backend-group \
-   --template=nucleus-backend-template \
-   --size=2 \
-   --region=us-east1
+gcloud compute instance-templates create web-server-template \
+          --metadata-from-file startup-script=startup.sh \
+          --network nucleus-vpc \
+          --machine-type g1-small \
+          --region us-east1
 
-gcloud compute firewall-rules create nucleus-web-server-fw \
-    --network=nucleus-vpc \
-    --allow=tcp:80
 
-gcloud compute health-checks create http http-basic-check
+gcloud compute instance-groups managed create web-server-group \
+          --base-instance-name web-server \
+          --size 2 \
+          --template web-server-template \
+          --region us-east1
 
+
+gcloud compute firewall-rules create web-server-firewall \
+          --allow tcp:80 \
+          --network nucleus-vpc
+gcloud compute http-health-checks create http-basic-check
 gcloud compute instance-groups managed \
-  --set-named-ports nucleus-backend-group \
-  --named-ports http:80 \
-  --region us-east1
+          set-named-ports web-server-group \
+          --named-ports http:80 \
+          --region us-east1
 
-gcloud compute backend-services create nucleus-web-backend-service \
-  --protocol=HTTP \
-  --health-checks=http-basic-check \
-  --global
 
-gcloud compute backend-services add-backend nucleus-web-backend-service \
-  --instance-group=nucleus-backend-group \
-  --instance-group-region=us-east1 \
-  --global
+gcloud compute backend-services create web-server-backend \
+          --protocol HTTP \
+          --http-health-checks http-basic-check \
+          --global
+gcloud compute backend-services add-backend web-server-backend \
+          --instance-group web-server-group \
+          --instance-group-region us-east1 \
+          --global
 
-gcloud compute url-maps create web-map-http \
-  --default-service nucleus-web-backend-service
 
+gcloud compute url-maps create web-server-map \
+          --default-service web-server-backend
 gcloud compute target-http-proxies create http-lb-proxy \
-  --url-map web-map-http
+          --url-map web-server-map
+
 
 gcloud compute forwarding-rules create http-content-rule \
-  --global \
-  --target-http-proxy=http-lb-proxy \
-  --ports=80
+        --global \
+        --target-http-proxy http-lb-proxy \
+        --ports 80
+gcloud compute forwarding-rules list
