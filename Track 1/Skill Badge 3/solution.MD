@@ -18,24 +18,22 @@ Make sure you create all resources in the us-east1 region and `us-east1-b` zone.
 7. Click **Create**.
 
 
-## Task 2: Create production VPC using Deployment Manager
+## Task 2: Create production VPC manually
 
 
-1. Copy the Deployment Manager configuration files to Cloud Shell using the following command:
-    ```
-      gsutil cp -r gs://cloud-training/gsp321/dm ~/
-    ```
-2. Edit prod-netork.yaml configuration file
-    ```
-    cd dm
-    edit prod-netork.yaml
-    ```
-3. Replace `SET_REGION` to `us-east1` in the editor, and then save the change.
-4. Go back to the Cloud Shell, use the following command to create the production VPC network with the configuration files:
-    ```
-    gcloud deployment-manager deployments create griffin-prod --config prod-network.yaml
-    ```
-5. Go back to the Cloud Console, navigate to **Deployment Manager** to confirm the deployment.
+1. In the Google Cloud Console, navigate to **VPC network > VPC networks**
+2. Click on Create VPC network.
+3. Enter `griffin-prod-vpc` to the Name field.
+4. Select Custom for the Subnet creation mode.
+5. Add `griffin-prod-wp` subnet with the following
+    1. Name: `griffin-dev-wp`
+    2. Region: `us-east1`
+    3. IP address range: `192.168.48.0/20`
+6. Click **+ Add subnet** and add `griffin-prod-mgmt` subnet with the following
+    1. Name: `griffin-dev-mgmt`
+    2. Region: `us-east1`
+    3. IP address range: `192.168.64.0/20`
+7. Click **Create**.
 
 
 ## Task 3: Create bastion host
@@ -66,7 +64,7 @@ Make sure you create all resources in the us-east1 region and `us-east1-b` zone.
     * FieldValueName: `allow-bastion-prod-ssh`
     * Network: `griffin-prod-vpc`
     * Targets: `bastion`
-    * Source IP ranges: `192.168.48.0/20`
+    * Source IP ranges: `192.168.64.0/20`
     * Protocols and ports: `tcp: 22`
 14. Click **CREATE**.
 
